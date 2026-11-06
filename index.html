@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Family Counter Hub</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --accent: #38bdf8; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 1rem; }
+header { text-align: center; margin-bottom: 1rem; }
+#clock { font-size: 2.5rem; font-weight: bold; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+.card { background: var(--card); border-radius: 12px; padding: 1rem; }
+.card h2 { color: var(--accent); margin-bottom: 0.5rem; }
+input, textarea, button { width: 100%; padding: 0.6rem; margin: 0.3rem 0; border: none; border-radius: 8px; font-size: 1rem; }
+button { background: var(--accent); color: #0f172a; font-weight: bold; cursor: pointer; }
+.voice-btn { background: #f87171; color: white; }
+ul { list-style: none; }
+li { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #334155; }
+.done { text-decoration: line-through; opacity: 0.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 Family Counter Hub</h1>
+  <div id="clock"></div>
+  <div id="date"></div>
+</header>
+<div class="grid">
+  <div class="card"><h2>🌤️ Weather</h2><div id="weather">Loading...</div><input id="city" placeholder="City or leave blank for location"><button onclick="loadWeather()">Update</button></div>
+  <div class="card"><h2>📖 Word & Fact</h2><div id="word"></div><div id="fact"></div></div>
+  <div class="card"><h2>✅ To-Do</h2><input id="todoInput" placeholder="Task"><button onclick="addTodo()">Add</button><button class="voice-btn" onclick="startVoice('todo')">🎤 Voice</button><ul id="todoList"></ul></div>
+  <div class="card"><h2>🛒 Grocery</h2><input id="groceryInput" placeholder="Item"><button onclick="addGrocery()">Add</button><button class="voice-btn" onclick="startVoice('grocery')">🎤 Voice</button><ul id="groceryList"></ul></div>
+  <div class="card"><h2>🧹 Chores</h2><div id="chores"></div><button onclick="resetChores()">Reset</button></div>
+  <div class="card"><h2>🍳 Recipes</h2><input id="recipeName" placeholder="Name"><textarea id="recipeNotes" rows="2"></textarea><button onclick="addRecipe()">Add</button><ul id="recipeList"></ul></div>
+  <div class="card"><h2>📅 Calendars</h2><p>Secret ICS URLs from Google Calendar</p><input id="cal1" placeholder="Yours"><input id="cal2" placeholder="Wife's"><button onclick="loadCalendars()">Load</button><div id="events"></div></div>
+  <div class="card"><h2>⚽ Sports</h2><button onclick="loadSports('nfl')">NFL</button><button onclick="loadSports('nba')">NBA</button><button onclick="loadSports('mlb')">MLB</button><div id="sports"></div></div>
+</div>
+<div class="card"><button onclick="saveSettings()">Save</button><button onclick="clearAll()">Clear All</button><p>Add to Home Screen on iPad. Data local to device.</p></div>
+<script>
+function updateClock(){const n=new Date();document.getElementById('clock').textContent=n.toLocaleTimeString();document.getElementById('date').textContent=n.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});}setInterval(updateClock,1000);updateClock();
+async function loadWeather(){let lat=39.74,lon=-104.99;const city=document.getElementById('city').value.trim();if(city){try{const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`).then(r=>r.json());if(g.results?.[0]){lat=g.results[0].latitude;lon=g.results[0].longitude;}}catch(e){}}else if(navigator.geolocation){try{const p=await new Promise((r,j)=>navigator.geolocation.getCurrentPosition(r,j,{timeout:5000}));lat=p.coords.latitude;lon=p.coords.longitude;}catch(e){}}try{const d=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&temperature_unit=fahrenheit`).then(r=>r.json());document.getElementById('weather').innerHTML=`<strong>${Math.round(d.current.temperature_2m)}°F</strong> High ${Math.round(d.daily.temperature_2m_max[0])} / Low ${Math.round(d.daily.temperature_2m_min[0])}`;}catch(e){document.getElementById('weather').textContent='Unavailable';}}loadWeather();
+async function loadWord(){const words=['serendipity','ephemeral','luminous','resilient','quintessential'];const w=words[new Date().getDate()%words.length];try{const d=await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${w}`).then(r=>r.json());document.getElementById('word').innerHTML=`<strong>${w}</strong>: ${d[0]?.meanings[0]?.definitions[0]?.definition||''}`;}catch(e){document.getElementById('word').textContent=w;}}loadWord();
+async function loadFact(){try{const d=await fetch('https://factfacts.com/api.php').then(r=>r.json());document.getElementById('fact').innerHTML=`<strong>Fact:</strong> ${d.fact||'Cool fact!'}`;}catch(e){}}loadFact();
+function loadList(k,u){const items=JSON.parse(localStorage.getItem(k)||'[]');const ul=document.getElementById(u);ul.innerHTML='';items.forEach((it,i)=>{const li=document.createElement('li');li.innerHTML=`<span class="${it.done?'done':''}">${it.text}</span><button onclick="toggle('${k}',${i})">${it.done?'Undo':'Done'}</button><button onclick="removeItem('${k}',${i},'${u}')">✕</button>`;ul.appendChild(li);});}
+function addItem(k,id,u){const t=document.getElementById(id).value.trim();if(!t)return;const items=JSON.parse(localStorage.getItem(k)||'[]');items.push({text:t,done:false});localStorage.setItem(k,JSON.stringify(items));document.getElementById(id).value='';loadList(k,u);}
+function toggle(k,i){const items=JSON.parse(localStorage.getItem(k)||'[]');items[i].done=!items[i].done;localStorage.setItem(k,JSON.stringify(items));loadList(k,k==='todos'?'todoList':'groceryList');}
+function removeItem(k,i,u){const items=JSON.parse(localStorage.getItem(k)||'[]');items.splice(i,1);localStorage.setItem(k,JSON.stringify(items));loadList(k,u);}
+function addTodo(){addItem('todos','todoInput','todoList');}function addGrocery(){addItem('groceries','groceryInput','groceryList');}loadList('todos','todoList');loadList('groceries','groceryList');
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;if(SR){rec=new SR();rec.lang='en-US';}
+function startVoice(type){if(!rec){alert('Voice not supported');return;}rec.onresult=e=>{const text=e.results[0][0].transcript;if(type==='todo'){document.getElementById('todoInput').value=text;addTodo();}else{document.getElementById('groceryInput').value=text;addGrocery();}};rec.start();}
+const choreList=['Dishes','Laundry','Vacuum','Trash','Bathroom'];function loadChores(){const state=JSON.parse(localStorage.getItem('chores')||'{}');const div=document.getElementById('chores');div.innerHTML='';choreList.forEach(c=>{const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!state[c];cb.onchange=()=>{state[c]=cb.checked;localStorage.setItem('chores',JSON.stringify(state));};div.appendChild(cb);div.appendChild(document.createTextNode(' '+c));div.appendChild(document.createElement('br'));});}function resetChores(){localStorage.removeItem('chores');loadChores();}loadChores();
+function loadRecipes(){const rs=JSON.parse(localStorage.getItem('recipes')||'[]');const ul=document.getElementById('recipeList');ul.innerHTML='';rs.forEach((r,i)=>{const li=document.createElement('li');li.innerHTML=`<strong>${r.name}</strong><br><small>${r.notes}</small><button onclick="removeRecipe(${i})">✕</button>`;ul.appendChild(li);});}function addRecipe(){const n=document.getElementById('recipeName').value.trim(),notes=document.getElementById('recipeNotes').value.trim();if(!n)return;const rs=JSON.parse(localStorage.getItem('recipes')||'[]');rs.push({name:n,notes});localStorage.setItem('recipes',JSON.stringify(rs));document.getElementById('recipeName').value='';document.getElementById('recipeNotes').value='';loadRecipes();}function removeRecipe(i){const rs=JSON.parse(localStorage.getItem('recipes')||'[]');rs.splice(i,1);localStorage.setItem('recipes',JSON.stringify(rs));loadRecipes();}loadRecipes();
+async function loadCalendars(){const urls=[document.getElementById('cal1').value,document.getElementById('cal2').value].filter(Boolean);localStorage.setItem('cal1',document.getElementById('cal1').value);localStorage.setItem('cal2',document.getElementById('cal2').value);const div=document.getElementById('events');div.innerHTML='Loading...';let all=[];for(const url of urls){try{const text=await fetch(url).then(r=>r.text());text.split('BEGIN:VEVENT').slice(1).forEach(b=>{const s=(b.match(/SUMMARY:(.*)/)||[])[1]||'Event';const d=(b.match(/DTSTART[^:]*:(.*)/)||[])[1]||'';if(d)all.push({summary:s,dtstart:d.substring(0,15)});});}catch(e){}}all.sort((a,b)=>a.dtstart.localeCompare(b.dtstart));div.innerHTML=all.slice(0,8).map(e=>`<div>${e.summary} <small>${e.dtstart}</small></div>`).join('')||'Add ICS URLs';}document.getElementById('cal1').value=localStorage.getItem('cal1')||'';document.getElementById('cal2').value=localStorage.getItem('cal2')||'';
+async function loadSports(league){const map={nfl:'football/nfl',nba:'basketball/nba',mlb:'baseball/mlb'};try{const d=await fetch(`https://site.api.espn.com/apis/site/v2/sports/${map[league]}/scoreboard`).then(r=>r.json());const evs=d.events||[];document.getElementById('sports').innerHTML=evs.slice(0,4).map(ev=>{const c=ev.competitions[0];const h=c.competitors.find(x=>x.homeAway==='home'),a=c.competitors.find(x=>x.homeAway==='away');return `${a.team.abbreviation} ${a.score||'-'} @ ${h.team.abbreviation} ${h.score||'-'} (${ev.status.type.shortDetail})`;}).join('<br>')||'No games';}catch(e){document.getElementById('sports').textContent='Unavailable';}}
+function saveSettings(){localStorage.setItem('city',document.getElementById('city').value);alert('Saved');}document.getElementById('city').value=localStorage.getItem('city')||'';function clearAll(){if(confirm('Clear everything?')){localStorage.clear();location.reload();}}
+</script>
+</body>
+</html>
